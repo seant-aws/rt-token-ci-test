@@ -1,0 +1,42 @@
+name: Bot
+on:
+  workflow_dispatch:
+    inputs:
+      dispatch_ci:
+        description: Dispatch ci.yml on the PR branch
+        type: boolean
+        default: true
+      dispatch_release:
+        description: Also dispatch release.yml
+        type: boolean
+        default: false
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: bot/test-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create branch and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          echo "${{ github.run_id }}" > "bot-${{ github.run_id }}.txt"
+          git add .
+          git commit -m "bot: test commit ${{ github.run_id }}"
+          git push origin "$BRANCH"
+          echo "HEAD=$(git rev-parse HEAD)"
+      - name: Open PR
+        run: gh pr create --base main --head "$BRANCH" --title "Bot test ${{ github.run_id }}" --body "Automated test PR from run ${{ github.run_id }}"
+      - name: Dispatch CI
+        if: ${{ inputs.dispatch_ci }}
+        run: gh workflow run ci.yml --ref "$BRANCH"
+      - name: Dispatch Release
+        if: ${{ inputs.dispatch_release }}
+        run: gh workflow run release.yml --ref main

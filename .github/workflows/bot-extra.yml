@@ -1,0 +1,43 @@
+name: Bot Extra
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        required: true
+        type: string
+      mode:
+        description: "empty-commit | check-run"
+        required: true
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: write
+  statuses: write
+jobs:
+  extra:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH: ${{ inputs.branch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+      - name: Empty commit then dispatch CI
+        if: ${{ inputs.mode == 'empty-commit' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "bot: empty commit ${{ github.run_id }}"
+          git push origin "HEAD:$BRANCH"
+          echo "HEAD=$(git rev-parse HEAD)"
+          sleep 5
+          gh workflow run ci.yml --ref "$BRANCH"
+      - name: Create check run and commit status via API
+        if: ${{ inputs.mode == 'check-run' }}
+        run: |
+          SHA=$(git rev-parse HEAD); echo "SHA=$SHA"
+          gh api -X POST repos/${{ github.repository }}/check-runs -f name=test -f head_sha=$SHA -f status=completed -f conclusion=success --jq '.id,.app.slug'
+          gh api -X POST repos/${{ github.repository }}/statuses/$SHA -f context=test -f state=success --jq '.id,.creator.login'

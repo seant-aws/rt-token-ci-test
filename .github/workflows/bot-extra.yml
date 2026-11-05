@@ -6,7 +6,7 @@ on:
         required: true
         type: string
       mode:
-        description: "empty-commit | check-run"
+        description: "empty-commit | check-run | push-only"
         required: true
         type: string
 permissions:
@@ -35,6 +35,14 @@ jobs:
           echo "HEAD=$(git rev-parse HEAD)"
           sleep 5
           gh workflow run ci.yml --ref "$BRANCH"
+      - name: Push a commit only (no dispatch)
+        if: ${{ inputs.mode == 'push-only' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "bot: push-only commit ${{ github.run_id }}"
+          git push origin "HEAD:$BRANCH"
+          echo "HEAD=$(git rev-parse HEAD)"
       - name: Create check run and commit status via API
         if: ${{ inputs.mode == 'check-run' }}
         run: |
